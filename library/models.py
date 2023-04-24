@@ -9,6 +9,9 @@ class Genre(models.Model):
     def __str__(self):
         return self.name
 
+    # class Meta:
+
+
 class Author(models.Model):
     author_id = models.AutoField(primary_key=True)
     first_name = models.CharField("First name", max_length=100)
@@ -19,6 +22,7 @@ class Author(models.Model):
 
     def __str__(self):
         return f"{self.first_name} - {self.last_name}"
+
 
 class Book(models.Model):
     objects = None
@@ -34,6 +38,9 @@ class Book(models.Model):
 
     def __str__(self):
         return self.title
+
+    def display_genre(self):
+        return self.genre
 
 class BookInstance(models.Model):
     instance_id = models.AutoField(primary_key=True, default=uuid.uuid4, help_text="Unique book UUID code")
