@@ -2,28 +2,8 @@ from django.shortcuts import render
 from .models import Genre, Author, Book, BookInstance
 from django.shortcuts import render, get_object_or_404
 from django.views import generic
-
-class BookListView(generic.ListView):
-    model = Book
-    # patys galite nustatyti šablonui kintamojo vardą
-    context_object_name = 'my_book_list'
-    # gauti sąrašą 3 knygų su žodžiu pavadinime 'ir'
-    queryset = Book.objects.filter(title__icontains='ir')[:3]
-    # šitą jau panaudojome. Neįsivaizduojate, kokį default kelią sukuria :)
-    template_name = 'books/my_arbitrary_template_name_list.html'
-
-    def get_queryset(self):
-        return Book.objects.filter(title__icontains='ir')[:3]
-
-    def get_context_data(self, **kwargs):
-        context = super(BookListView, self).get_context_data(**kwargs)
-        context['duomenys'] = 'eilutė iš lempos'
-        return context
-
-class BookDetailView(generic.DetailView):
-    model = Book
-    template_name = 'book_detail.html'
-
+from django.core.paginator import Paginator
+from django.db.models import Q
 
 def index(request):
     book_count = Book.objects.all().count()
@@ -45,13 +25,34 @@ def author(request, author_id):
     return render(request, 'author.html', {'author': single_author})
 
 def authors(request):
-    authors = Author.objects.all()
+    paginator = Paginator(Author.objects.all(), 2)
+    page_number = request.GET.get('page')
+    paged_authors = paginator.get_page(page_number)
     context = {
-        'authors': authors
+        'authors': paged_authors
     }
-    print(authors)
     return render(request, 'authors.html', context=context)
 
 def books(request):
     books = Book.objects.all()
     return render(request, 'book_list.html', {'books': books})
+
+class BookListView(generic.ListView):
+    model = Book
+    paginate_by = 2
+    template_name = 'book_list.html'
+
+class BookDetailView(generic.DetailView):
+    model = Book
+    template_name = 'book_detail.html'
+
+def search(request):
+    """
+    paprasta paieška. query ima informaciją iš paieškos laukelio,
+    search_results prafiltruoja pagal įvestą tekstą knygų pavadinimus ir aprašymus.
+    Icontains nuo contains skiriasi tuo, kad icontains ignoruoja ar raidės
+    didžiosios/mažosios.
+    """
+    query = request.GET.get('query')
+    search_results = Book.objects.filter(Q(title__icontains=query) | Q(summary__icontains=query))
+    return render(request, 'search.html', {'books': search_results, 'query': query})

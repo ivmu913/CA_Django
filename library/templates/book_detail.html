@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h1>{{ book.title }}</h1>
-
+{% load static %}
+  {% if book.cover %}
+    <img src="{ book.cover.url }}" style="margin: 20px;" class="book-cover">
+  {% else %}
+    <img src="{% static 'media/no_image.png' %}" style="margin: 20px;" class="book-cover">
+  {% endif %}
+<h1>{{ book.title }}</h1>
   <p><strong>Autorius:</strong> <a href="{% url 'author' book.author.pk %}">{{ book.author }}</a></p>
   <p><strong>Aprašymas:</strong> {{ book.summary }}</p>
   <p><strong>ISBN:</strong> {{ book.isbn }}</p>
