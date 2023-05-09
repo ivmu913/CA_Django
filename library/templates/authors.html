@@ -4,15 +4,17 @@
   <h1>Autoriai</h1>
   <p>Mūsų knygų autorių sąrašas.</p>
   {% for a in authors %}
-    <li><a href="{% url 'author' a.author_id %}">{{a.first_name}} {{a.last_name}}</a></li>
-      <div class="container puslapiai">
+    <li><a href="{% url 'author' a.id %}">{{a.first_name}} {{a.last_name}}</a></li>
+  {% endfor %}
+
+<div class="container puslapiai">
     <nav aria-label="...">
         {% if authors.has_other_pages %}
             <ul class="pagination pagination-sm justify-content-end">
                 {% for i in authors.paginator.page_range %}
                     {% if authors.number == i %}
                         <li class="page-item active">
-                            <a class="page-link">{{ i }}</a>
+                            <a class="page-link" href">{{ i }}</a>
                         </li>
                     {% else %}
                         <li class="page-item">
@@ -24,5 +26,5 @@
         {% endif %}
     </nav>
 </div>
-    {% endfor %}
+
 {% endblock %}

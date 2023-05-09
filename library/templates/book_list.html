@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-
+{% load static %}
 {% block content %}
-  {% load static %}
-    <h1>Knygų sąrašas</h1>
-    {% if object_list %}
-      <div class="row">
-      {% for book in object_list %}
-        <div class="col-md-4 d-flex align-items-stretch">
-          <div class="card mb-4 shadow-sm box">
+
+  <h1>Knygų sąrašas</h1></br>
+    {% if book_list %}
+    <div class="row">
+      {% for book in book_list %}
+        <div class="col-md-4 d-flex align-items-stretch"">
+          <div class="card mb-4 shadow-sm">
             {% if book.cover %}
-              <img src="{{ book.cover.url }}" class="card-img-top book-cover" alt="...">
+              <img src="{{ book.cover.url }}" class="card-img-top" alt="...">
             {% else %}
-              <img src="{% static 'media/no_image.png' %}" class="card-img-top book-cover">
+              <img src="{% static 'media/no_image.png' %}" class="card-img-top">
             {% endif %}
             <div class="card-body">
               <h6 class="card-subtitle mb-2 text-muted">{{ book.author }}</h6>
@@ -25,21 +25,20 @@
       <p>Bibliotekoje knygų nėra.</p>
     {% endif %}
 
-   <div class="pagination">
-      <span class="step-links">
-          {% if page_obj.has_previous %}
-              <a href="?page=1">&laquo; pirmas</a>
-              <a href="?page={{ page_obj.previous_page_number }}">atgal</a>
-          {% endif %}
-
-          <span class="current">
-              {{ page_obj.number }} iš {{ page_obj.paginator.num_pages }}
-          </span>
-
-          {% if page_obj.has_next %}
-              <a href="?page={{ page_obj.next_page_number }}">pirmyn</a>
-              <a href="?page={{ page_obj.paginator.num_pages }}">paskutinis &raquo;</a>
-          {% endif %}
+  <div class="pagination">
+    <span class="step-links">
+      {% if page_obj.has_previous %}
+        <a href="?page=1">&laquo; pirmas</a>
+        <a href="?page={{ page_obj.previous_page_number }}">atgal</a>
+      {% endif %}
+      <span class="current">
+          {{ page_obj.number }} iš {{ page_obj.paginator.num_pages }}
       </span>
-   </div>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}">pirmyn</a>
+        <a href="?page={{ page_obj.paginator.num_pages }}">paskutinis &raquo;</a>
+      {% endif %}
+    </span>
+  </div>
+
 {% endblock %}

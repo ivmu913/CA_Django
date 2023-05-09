@@ -1,9 +1,5 @@
 {% extends "base.html" %}
 
-{% block title %}
-Prisijungimas
-{% endblock %}
-
 {% block content %}
 
   {% if form.errors %}
@@ -12,7 +8,9 @@ Prisijungimas
 
   {% if next %}
     {% if user.is_authenticated %}
-      <p>Neturite prieigos prie šios informacijos. Turite prisijungti.</p>
+      <p>Neturite prieigos prie šio puslpaio, bandykite jungtis su kita paskyra.</p>
+    {% else %}
+      <p>Norėdami matyti šį turinį, turite prisijungti.</p>
     {% endif %}
   {% endif %}
 
@@ -32,6 +30,8 @@ Prisijungimas
     <input type="hidden" name="next" value="{{ next }}" />
   </form>
 
+  {# Assumes you setup the password_reset view in your URLconf #}
   <p><a href="{% url 'password_reset' %}">Pamiršote slaptažodį?</a></p>
 
 {% endblock %}
+

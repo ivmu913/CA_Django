@@ -1,30 +1,45 @@
-from .models import Genre, Author, Book, BookInstance
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import HttpResponse
+from .models import Book, Author, BookInstance, Genre, BookReview
 from django.views import generic
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.contrib.auth.forms import User
+from django.views.decorators.csrf import csrf_protect
+from django.contrib import messages
+from .forms import BookReviewForm
+from django.urls import reverse
+from django.views.generic.edit import CreateView
+from django import forms
+from django.views.generic import FormView
+from django.views.generic.edit import FormMixin
+
 
 def index(request):
-    book_count = Book.objects.all().count()
-    book_instance_count = BookInstance.objects.all().count()
-    author_count = Author.objects.all().count()
-    available_books_count = BookInstance.objects.filter(book_status__exact='a').count()
-    number_of_visits = request.session.get('number_of_visits', 1)
-    request.session['number_of_visits'] = number_of_visits + 1
+    # Suskaičiuokime keletą pagrindinių objektų
+    num_books = Book.objects.all().count()
+    num_instances = BookInstance.objects.all().count()
 
+    # Laisvos knygos (tos, kurios turi statusą 'g')
+    num_instances_available = BookInstance.objects.filter(status__exact='g').count()
+
+    # Kiek yra autorių
+    num_authors = Author.objects.count()
+    num_visits = request.session.get('num_visits', 0)
+    request.session['num_visits'] = num_visits + 1
+
+    # perduodame informaciją į šabloną žodyno pavidale:
     context = {
-        'books': book_count,
-        'book_instances': book_instance_count,
-        'authors': author_count,
-        'available': available_books_count,
-        'number_of_visits': number_of_visits
+        'num_books': num_books,
+        'num_instances': num_instances,
+        'num_instances_available': num_instances_available,
+        'num_authors': num_authors,
+        'num_visits': num_visits,
     }
 
-    return render(request, "index.html", context)
+    # renderiname index.html, su duomenimis kintamąjame context
+    return render(request, 'index.html', context=context)
 
-def author(request, author_id):
-    single_author = get_object_or_404(Author, pk=author_id)
-    return render(request, 'author.html', {'author': single_author})
 
 def authors(request):
     paginator = Paginator(Author.objects.all(), 2)
@@ -35,18 +50,11 @@ def authors(request):
     }
     return render(request, 'authors.html', context=context)
 
-def books(request):
-    books = Book.objects.all()
-    return render(request, 'book_list.html', {'books': books})
 
-class BookListView(generic.ListView):
-    model = Book
-    paginate_by = 2
-    template_name = 'book_list.html'
+def author(request, author_id):
+    single_author = get_object_or_404(Author, pk=author_id)
+    return render(request, 'author.html', {'author': single_author})
 
-class BookDetailView(generic.DetailView):
-    model = Book
-    template_name = 'book_detail.html'
 
 def search(request):
     """
@@ -58,3 +66,89 @@ def search(request):
     query = request.GET.get('query')
     search_results = Book.objects.filter(Q(title__icontains=query) | Q(summary__icontains=query))
     return render(request, 'search.html', {'books': search_results, 'query': query})
+
+
+class BookListView(generic.ListView):
+    model = Book
+    paginate_by = 2
+    template_name = 'book_list.html'
+
+
+class BookDetailView(FormMixin, generic.DetailView):
+    model = Book
+    template_name = 'book_detail.html'
+    form_class = BookReviewForm
+
+    class Meta:
+        ordering = ['title']
+
+    def get_success_url(self):
+        return reverse('book-detail', kwargs={'pk': self.object.id})
+
+    def get_context_data(self, *args, **kwargs):
+        context = super(BookDetailView, self).get_context_data(**kwargs)
+        context['form'] = BookReviewForm(initial={'book': self.object})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        if form.is_valid():
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
+
+    def form_valid(self, form):
+        form.instance.book = self.object
+        form.instance.reviewer = self.request.user
+
+        form.save()
+        return super(BookDetailView, self).form_valid(form)
+
+
+# class ReviewCreate(CreateView):
+#     model = BookReview
+#     form_class = BookReviewForm
+
+#     def get_success_url(self):
+#         return reverse('book-detail', kwargs={'pk': self.object.entry.pk})
+
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+
+
+class LoanedBooksByUserListView(LoginRequiredMixin, generic.ListView):
+    model = BookInstance
+    template_name = 'user_books.html'
+    paginate_by = 10
+
+    def get_queryset(self):
+        return BookInstance.objects.filter(reader=self.request.user).filter(status__exact='p').order_by('due_back')
+
+
+@csrf_protect
+def register(request):
+    if request.method == "POST":
+        # pasiimame reikšmes iš registracijos formos
+        username = request.POST['username']
+        email = request.POST['email']
+        password = request.POST['password']
+        password2 = request.POST['password2']
+        # tikriname, ar sutampa slaptažodžiai
+        if password == password2:
+            # tikriname, ar neužimtas username
+            if User.objects.filter(username=username).exists():
+                messages.error(request, f'Vartotojo vardas {username} užimtas!')
+                return redirect('register')
+            else:
+                # tikriname, ar nėra tokio pat email
+                if User.objects.filter(email=email).exists():
+                    messages.error(request, f'Vartotojas su el. paštu {email} jau užregistruotas!')
+                    return redirect('register')
+                else:
+                    # jeigu viskas tvarkoje, sukuriame naują vartotoją
+                    User.objects.create_user(username=username, email=email, password=password)
+        else:
+            messages.error(request, 'Slaptažodžiai nesutampa!')
+            return redirect('register')
+    return render(request, 'register.html')

@@ -1,66 +1,102 @@
 from django.db import models
+from django.urls import reverse
+from django.contrib.auth.models import User
+from datetime import date
 import uuid
-from django_resized import ResizedImageField
+from tinymce.models import HTMLField
 
-# Create your models here.
+
 class Genre(models.Model):
-    genre_id = models.AutoField(primary_key=True)
-    name = models.CharField('Name', max_length=100, help_text="Enter type of genre: ")
+    name = models.CharField('Pavadinimas', max_length=200, help_text='Įveskite knygos žanrą (pvz. detektyvas)')
 
     def __str__(self):
         return self.name
 
-    # class Meta:
-
-
-class Author(models.Model):
-    author_id = models.AutoField(primary_key=True)
-    first_name = models.CharField("First name", max_length=100)
-    last_name = models.CharField("Last name", max_length=100)
-    description = models.TextField('Aprašymas', max_length=2000, default='')
-
-    class Meta:
-        ordering = ['last_name', 'first_name']
-
-    def __str__(self):
-        return f"{self.first_name} - {self.last_name}"
-
 
 class Book(models.Model):
-    objects = None
-    book_id = models.AutoField(primary_key=True)
-    author = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True)
-    title = models.CharField('Title', max_length=200, help_text="Enter book title: ")
-    description = models.TextField('Description', max_length=1000, help_text="Enter short book description: ")
-    isbn = models.CharField(
-        'ISBN', max_length=13,
-        help_text='ISBN nr.: <a href=https://www.isbn-international.org/content/what-isbn>ISBN kodas</a>'
-    )
-    genre = models.ManyToManyField(Genre, help_text="Enter books genre: ")
-    cover = ResizedImageField('Viršelis', size=[300, 400], upload_to='covers', null=True)
+    """Modelis reprezentuoja knygą (bet ne specifinę knygos kopiją)"""
+    title = models.CharField('Pavadinimas', max_length=200)
+    author = models.ForeignKey('Author', on_delete=models.SET_NULL, null=True, related_name='books')
+    summary = models.TextField('Aprašymas', max_length=1000, help_text='Trumpas knygos aprašymas')
+    isbn = models.CharField('ISBN', max_length=13,
+                            help_text='13 Simbolių <a href="https://www.isbn-international.org/content/what-isbn">ISBN kodas</a>')
+    genre = models.ManyToManyField(Genre, help_text='Išrinkite žanrą(us) šiai knygai')
+    cover = models.ImageField('Viršelis', upload_to='covers', null=True)
 
     def __str__(self):
         return self.title
 
     def display_genre(self):
-        return self.genre
+        return ', '.join(genre.name for genre in self.genre.all()[:3])
+
+    display_genre.short_description = 'Žanras'
+
+    def get_absolute_url(self):
+        """Nurodo konkretaus aprašymo galinį adresą"""
+        return reverse('book-detail', args=[str(self.id)])
+
 
 class BookInstance(models.Model):
-    instance_id = models.AutoField(primary_key=True, default=uuid.uuid4, help_text="Unique book UUID code")
-    book = models.ForeignKey(Book, on_delete=models.SET_NULL, null=True)
-    due_back = models.DateField("Available", null=True, blank=True)
+    """Modelis, aprašantis konkrečios knygos kopijos būseną"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, help_text='Unikalus ID knygos kopijai')
+    book = models.ForeignKey('Book', on_delete=models.SET_NULL, null=True)
+    due_back = models.DateField('Bus prieinama', null=True, blank=True)
+    reader = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 
     LOAN_STATUS = (
-        ('p', 'Processing'),
-        ('t', 'Taken'),
-        ('a', 'Available'),
-        ('r', 'Reserved'),
+        ('a', 'Administruojama'),
+        ('p', 'Paimta'),
+        ('g', 'Galima paimti'),
+        ('r', 'Rezervuota'),
     )
 
-    book_status = models.CharField(max_length=1, default='a', blank=True, choices=LOAN_STATUS, help_text="Book status")
+    status = models.CharField(
+        max_length=1,
+        choices=LOAN_STATUS,
+        blank=True,
+        default='a',
+        help_text='Statusas',
+    )
 
     class Meta:
         ordering = ['due_back']
 
+    @property
+    def is_overdue(self):
+        if self.due_back and date.today() > self.due_back:
+            return True
+        return False
+
     def __str__(self):
-        return f"{self.book.title}"
+        """String for representing the Model object."""
+        return f'{self.id} ({self.book.title})'
+
+
+class Author(models.Model):
+    """Model representing an author."""
+    first_name = models.CharField('Vardas', max_length=100)
+    last_name = models.CharField('Pavardė', max_length=100)
+    description = HTMLField()
+
+    class Meta:
+        ordering = ['last_name', 'first_name']
+
+    # def get_absolute_url(self):
+    #     """Returns the url to access a particular author instance."""
+    #     return reverse('author-detail', args=[str(self.id)])
+
+    def display_books(self):
+        return ', '.join(book.title for book in self.books.all()[:3])
+
+    display_books.short_description = 'Knygos'
+
+    def __str__(self):
+        """String for representing the Model object."""
+        return f'{self.last_name} {self.first_name}'
+
+
+class BookReview(models.Model):
+    book = models.ForeignKey('Book', on_delete=models.SET_NULL, null=True, blank=True)
+    reviewer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    date_created = models.DateTimeField(auto_now_add=True)
+    content = models.TextField('Atsiliepimas', max_length=2000)
